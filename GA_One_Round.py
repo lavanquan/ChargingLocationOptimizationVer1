@@ -302,7 +302,6 @@ while index < 1:
                     Network_Frame.e[j] > 0])}
         writer.writerow(row)
         confidence_interval.append(indi["fitness"])
-        idRun = idRun + 1
 
     row = {"Lan Chay": "Average", "Time": sum_time / nbRun, "Co Sac": sum_lifetime / nbRun,
            "Khong Sac": min([Network_Frame.E[j] / Network_Frame.e[j] for j, _ in enumerate(Network_Frame.node_pos) if
