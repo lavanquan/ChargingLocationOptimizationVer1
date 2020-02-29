@@ -7,28 +7,29 @@ from scipy.stats import sem, t
 
 
 def fitness(person):
-    charge_pos = person["location"]
-    total_distance = 0
-    if len(charge_pos) > 1:
-        for i in range(len(charge_pos) - 1):
-            total_distance = total_distance + Network_Frame.distance(charge_pos[i], charge_pos[i + 1])
-    total_distance = total_distance + Network_Frame.distance(charge_pos[0],
-                                                             Network_Frame.depot) + Network_Frame.distance(
-        charge_pos[-1], Network_Frame.depot)
-    time_move = total_distance / Network_Frame.velocity
     total = 0
-    for i in range(len(person["T"]) - 1):
-        total = total + time_move + person["T"][i] + sum(person["x"][i])
+    for k in range(len(person["T"]) - 1):
+        charge_pos = person["d"][k]
+        total_distance = 0
+        if len(charge_pos) > 1:
+            for u in range(len(charge_pos) - 1):
+                total_distance = total_distance + Network_Frame.distance(charge_pos[u], charge_pos[u + 1])
+        total_distance = total_distance + Network_Frame.distance(charge_pos[0],
+                                                                 Network_Frame.depot) + Network_Frame.distance(
+            charge_pos[-1], Network_Frame.depot)
+        time_move = total_distance / Network_Frame.velocity
+        total = total + time_move + person["T"][k] + sum(person["x"][k])
     x = person["x"][-1]
+    charge_pos = person["d"][-1]
     total = total + person["T"][-1]
-    for u, xu in enumerate(x):
-        if xu == 0:
+    for u, _ in enumerate(charge_pos):
+        if x[u] == 0:
             break
         if u == 0:
             time_to_move = Network_Frame.distance(Network_Frame.depot, charge_pos[u]) / Network_Frame.velocity
         else:
             time_to_move = Network_Frame.distance(charge_pos[u - 1], charge_pos[u]) / Network_Frame.velocity
-        total = total + time_to_move + xu
+        total = total + time_to_move + x[u]
     total = total + person["remain"]
     return total
 
@@ -37,20 +38,23 @@ def repair(person):
     E_mc_now = Network_Frame.E_mc
     E_now = [item for item in Network_Frame.E]
     node_pos = Network_Frame.node_pos
-    charge_pos = person["location"]
-    total_distance = 0
-    if len(charge_pos) > 1:
-        for i in range(len(charge_pos) - 1):
-            total_distance = total_distance + Network_Frame.distance(charge_pos[i], charge_pos[i + 1])
-    total_distance = total_distance + Network_Frame.distance(charge_pos[0],
-                                                             Network_Frame.depot) + Network_Frame.distance(
-        charge_pos[-1], Network_Frame.depot)
-    E_move = total_distance * Network_Frame.e_move / Network_Frame.velocity
-    off = {"location": copy.deepcopy(person["location"]), "T": [], "x": [], "remain": -1, "fitness": 0.0}
+    off = {"T": [], "x": [], "d": [], "remain": -1, "fitness": 0.0}
     isStop = False
-    for index, x in enumerate(person["x"]):
+    for k in range(len(person["T"])):
+        x = person["x"][k]
+        charge_pos = person["d"][k]
+        #  calculate E_move
+        total_distance = 0
+        if len(charge_pos) > 1:
+            for i in range(len(charge_pos) - 1):
+                total_distance = total_distance + Network_Frame.distance(charge_pos[i], charge_pos[i + 1])
+        total_distance = total_distance + Network_Frame.distance(charge_pos[0],
+                                                                 Network_Frame.depot) + Network_Frame.distance(
+            charge_pos[-1], Network_Frame.depot)
+        E_move = total_distance * Network_Frame.e_move / Network_Frame.velocity
+
         T_max = (Network_Frame.E_max - E_mc_now) / Network_Frame.e_mc
-        T = min(T_max, person["T"][index])
+        T = min(T_max, person["T"][k])
         temp_E = [E_now[j] - T * Network_Frame.e[j] for j, _ in enumerate(node_pos)]
         temp_E_mc = E_mc_now + T * Network_Frame.e_mc
         eNode = min(
@@ -65,8 +69,8 @@ def repair(person):
             E_mc_now = temp_E_mc
             E_now = temp_E
             off["T"].append(T)
-            row = [0 for u, _ in enumerate(charge_pos)]
-            for u, xu in enumerate(x):
+            x_row = [0 for u, _ in enumerate(charge_pos)]
+            for u, _ in enumerate(charge_pos):
                 if u == 0:
                     time_move = Network_Frame.distance(Network_Frame.depot, charge_pos[u]) / Network_Frame.velocity
                 else:
@@ -75,26 +79,26 @@ def repair(person):
                 if eNode < 0:
                     isStop = True
                     break
-                p = [min(Network_Frame.charging(node, charge_pos[u]) * xu,
-                         Network_Frame.E[j] - E_now[j] + (time_move + xu) * Network_Frame.e[j]) for j, node in
+                p = [min(Network_Frame.charging(node, charge_pos[u]) * x[u],
+                         Network_Frame.E[j] - E_now[j] + (time_move + x[u]) * Network_Frame.e[j]) for j, node in
                      enumerate(node_pos)]
                 temp_E_mc = E_mc_now - sum(p) - time_move * Network_Frame.e_move
-                temp_E = [E_now[j] + p[j] - (time_move + xu) * Network_Frame.e[j] for j, _ in enumerate(node_pos)]
+                temp_E = [E_now[j] + p[j] - (time_move + x[u]) * Network_Frame.e[j] for j, _ in enumerate(node_pos)]
 
                 if min(temp_E) < 0:
                     isStop = True
                     break
                 else:
-                    row[u] = xu
+                    x_row[u] = x[u]
                     E_mc_now = temp_E_mc
                     E_now = temp_E
-            off["x"].append(row)
+            off["x"].append(x_row)
+            off["d"].append(charge_pos)
             if not isStop:
                 E_mc_now = E_mc_now - Network_Frame.distance(Network_Frame.depot, charge_pos[
                     -1]) * Network_Frame.e_move / Network_Frame.velocity
                 E_now = [E_now[j] - Network_Frame.distance(Network_Frame.depot, charge_pos[-1]) * Network_Frame.e[
-                    j] / Network_Frame.velocity for j, _ in
-                         enumerate(node_pos)]
+                    j] / Network_Frame.velocity for j, _ in enumerate(node_pos)]
             else:
                 break
     if off["remain"] == -1:
@@ -104,14 +108,15 @@ def repair(person):
 
 
 def individual(p_rand, is_sorted):
-    person = {"location": locate_init(is_sorted=is_sorted), "T": [], "x": [], "remain": 0, "fitness": 0}
+    person = {"T": [], "x": [], "d": [], "remain": 0, "fitness": 0}
+    person["d"].append(locate_init(is_sorted=is_sorted))
     r = random.random()
     if r <= p_rand:
         T, x = random_init(E_now=Network_Frame.E, E_mc_now=Network_Frame.E_mc,
-                           charge_location=person["location"])
+                           charge_location=person["d"][0])
     else:
         T, x = uniform_init(E_now=Network_Frame.E, E_mc_now=Network_Frame.E_mc,
-                            charge_location=person["location"])
+                            charge_location=person["d"][0])
     person["T"].append(T)
     person["x"].append(x)
     person = repair(person)
@@ -119,50 +124,61 @@ def individual(p_rand, is_sorted):
 
 
 def crossover(father, mother, has_hungary):
-    child = {"location": blx_pair(father=father["location"], mother=mother["location"], has_hungary=has_hungary),
-             "T": blx_scalar(father=father["T"], mother=mother["T"]),
+    child = {"T": blx_scalar(father=father["T"], mother=mother["T"]),
              "x": [blx_scalar(father=father["x"][i], mother=mother["x"][i]) for i, _ in enumerate(father["x"]) if
                    i < len(mother["x"])],
+             "d": [blx_pair(father=father["d"][i], mother=mother["d"][i], has_hungary=has_hungary) for i, _ in
+                   enumerate(father["d"]) if
+                   i < len(mother["d"])],
              "remain": 0, "fitness": 0}
     x_index = len(child["x"])
     while x_index < len(father["x"]):
         child["x"].append(father["x"][x_index])
         x_index = x_index + 1
+    d_index = len(child["d"])
+    while d_index < len(father["d"]):
+        child["d"].append(father["d"][d_index])
+        d_index = d_index + 1
     child = repair(child)
     return child
 
 
-def mutation(person, m_rand):
+def mutation(person, m_rand, p_sorted):
     off = copy.deepcopy(person)
     e = Network_Frame.e
     node_pos = Network_Frame.node_pos
     E_mc_now = Network_Frame.E_mc
-    charge_pos = person["location"]
     E_now = [Network_Frame.E[j] for j, _ in enumerate(node_pos)]
     # energy_add = [0 for k, _ in enumerate(node_pos)]
     for k, _ in enumerate(off["x"]):
         E_mc_now = E_mc_now + off["T"][k] * Network_Frame.e_mc
         E_now = [E_now[j] - off["T"][k] * e[j] for j, _ in enumerate(Network_Frame.node_pos)]
         x = person["x"][k]
-        for u, xu in enumerate(x):
+        charge_pos = person["d"][k]
+        for u in range(len(charge_pos)):
             if u == 0:
-                time = Network_Frame.distance(Network_Frame.depot, charge_pos[u]) / Network_Frame.velocity
+                time_move = Network_Frame.distance(Network_Frame.depot, charge_pos[u]) / Network_Frame.velocity
             else:
-                time = Network_Frame.distance(charge_pos[u - 1], charge_pos[u]) / Network_Frame.velocity
-            p = [min(Network_Frame.charging(node, charge_pos[u]) * xu,
-                     Network_Frame.E[j] - E_now[j] + (time + xu) * e[j]) for j, node in enumerate(node_pos)]
-            E_mc_now = E_mc_now - sum(p) - time * Network_Frame.e_move
-            E_now = [E_now[j] + p[j] - (time + xu) * e[j] for j, _ in enumerate(node_pos)]
+                time_move = Network_Frame.distance(charge_pos[u - 1], charge_pos[u]) / Network_Frame.velocity
+            p = [min(Network_Frame.charging(node, charge_pos[u]) * x[u],
+                     Network_Frame.E[j] - E_now[j] + (time_move + x[u]) * e[j]) for j, node in enumerate(node_pos)]
+            E_mc_now = E_mc_now - sum(p) - time_move * Network_Frame.e_move
+            E_now = [E_now[j] + p[j] - (time_move + x[u]) * e[j] for j, _ in enumerate(node_pos)]
         E_mc_now -= Network_Frame.distance(Network_Frame.depot,
                                            charge_pos[-1]) * Network_Frame.e_move / Network_Frame.velocity
-        E_now = [E_now[j] - Network_Frame.distance(Network_Frame.depot, charge_pos[-1]) * e[j] / Network_Frame.velocity
-                 for j, _ in enumerate(node_pos)]
+        E_now = [
+            E_now[j] - Network_Frame.distance(Network_Frame.depot, charge_pos[-1]) * e[j] / Network_Frame.velocity
+            for j, _ in enumerate(node_pos)]
 
     if min(E_now) < 0 or E_mc_now < 0:
         #  network can not generate a new round
         return -1
     else:
         r = random.random()
+        if r < p_sorted:
+            charge_pos = locate_init(is_sorted=True)
+        else:
+            charge_pos = locate_init(is_sorted=False)
         if r <= m_rand:
             tmp = random_init(E_now=E_now, E_mc_now=E_mc_now, charge_location=charge_pos)
         else:
@@ -172,6 +188,7 @@ def mutation(person, m_rand):
             T, x = tmp
             off["T"].append(T)
             off["x"].append(x)
+            off["d"].append(charge_pos)
             off = repair(off)
             return off
         else:
@@ -179,7 +196,7 @@ def mutation(person, m_rand):
             return -1
 
 
-def genetic(start, end, pc, pm, m_random, connection):
+def genetic(start, end, p_cross, p_mutate, p_sorted, m_rand, connection):
     global population
     sub_pop = []
     count = 0
@@ -187,19 +204,19 @@ def genetic(start, end, pc, pm, m_random, connection):
     while i < end:
         rc = random.random()
         rm = random.random()
-        if rc <= pc:
+        if rc <= p_cross:
             j = random.randint(0, population_size - 1)
             while j == i:
                 j = random.randint(0, population_size - 1)
             child = crossover(population[i], population[j], has_hungary=False)
-            mutated_child = mutation(child, m_random)
+            mutated_child = mutation(child, m_rand, p_sorted)
             if mutated_child != -1:
                 count += 1
                 sub_pop.append(mutated_child)
             else:
                 sub_pop.append(child)
-        if rm <= pm:
-            mutated_child = mutation(population[i], m_random)
+        if rm <= p_mutate:
+            mutated_child = mutation(population[i], m_rand, p_sorted)
             if mutated_child != -1:
                 count += 1
                 sub_pop.append(mutated_child)
@@ -208,7 +225,7 @@ def genetic(start, end, pc, pm, m_random, connection):
     connection.close()
 
 
-def evolution(maxIterator, pc, pm, m_random):
+def evolution(maxIterator, p_cross, p_mutate, p_sorted, m_rand):
     global population
     bestFitness = 0.0
     nbIte = 0
@@ -224,7 +241,8 @@ def evolution(maxIterator, pc, pm, m_random):
         for pid in range(nproc):
             connection.append(Pipe())
         for pid in range(nproc):
-            pro = Process(target=genetic, args=(5 * pid, 5 * (pid + 1), pc, pm, m_random, connection[pid][1]))
+            pro = Process(target=genetic,
+                          args=(5 * pid, 5 * (pid + 1), p_cross, p_mutate, p_sorted, m_rand, connection[pid][1]))
             process.append(pro)
             pro.start()
         for pid in range(nproc):
@@ -288,7 +306,7 @@ while index < 1:
                 population.append(individual(p_rand=p_random, is_sorted=True))
             else:
                 population.append(individual(p_rand=p_random, is_sorted=False))
-        indi, conv = evolution(maxIterator=5000, pc=0.8, pm=0.5, m_random=0.5)
+        indi, conv = evolution(maxIterator=5000, p_cross=0.8, p_mutate=0.5, p_sorted=p_sorted, m_rand=0.5)
         end_time = time.time()
         #  tong hop ket qua
         sum_lifetime = sum_lifetime + indi["fitness"]

@@ -40,19 +40,21 @@ def repair(person):
     E_now = [item for item in Network_Frame.E]
     node_pos = Network_Frame.node_pos
     charge_pos = person["location"]
-    total_distance = 0
-    if len(charge_pos) > 1:
-        for i in range(len(charge_pos) - 1):
-            total_distance = total_distance + Network_Frame.distance(charge_pos[i], charge_pos[i + 1])
-    total_distance = total_distance + Network_Frame.distance(charge_pos[0],
-                                                             Network_Frame.depot) + Network_Frame.distance(
-        charge_pos[-1], Network_Frame.depot)
-    E_move = total_distance * Network_Frame.e_move
     off = {"location": copy.deepcopy(person["location"]), "T": [], "x": [], "d": [], "remain": -1, "fitness": 0.0}
     isStop = False
     for k in range(len(person["T"])):
         x = person["x"][k]
         d = person["d"][k]
+        #  calculate E_move
+        total_distance = 0
+        if len(charge_pos) > 1:
+            for i in range(len(charge_pos) - 1):
+                total_distance = total_distance + Network_Frame.distance(charge_pos[i], charge_pos[i + 1])
+        total_distance = total_distance + Network_Frame.distance(charge_pos[0],
+                                                                 Network_Frame.depot) + Network_Frame.distance(
+            charge_pos[-1], Network_Frame.depot)
+        E_move = total_distance * Network_Frame.e_move / Network_Frame.velocity
+
         T_max = (Network_Frame.E_max - E_mc_now) / Network_Frame.e_mc
         T = min(T_max, person["T"][k])
         temp_E = [E_now[j] - T * Network_Frame.e[j] for j, _ in enumerate(node_pos)]
